@@ -8,6 +8,7 @@ import pino from "pino";
 import * as QRCode from "qrcode";
 import { loadAuthState } from "./session";
 import { dispatchToWebhooks } from "./handlers/messages";
+import { storeMessage } from "./store";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
@@ -137,6 +138,7 @@ async function connect(): Promise<void> {
 
       logger.info({ from, name }, "Incoming text message");
 
+      storeMessage({ from, name, message: text, timestamp, direction: "incoming" });
       dispatchToWebhooks({ from, name, message: text, timestamp });
     }
   });

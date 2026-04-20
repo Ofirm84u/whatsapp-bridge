@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { getStatus, getQRDataURL, getSocket } from "../client";
 import { addWebhook, removeWebhook, listWebhooks } from "../handlers/messages";
+import { storeMessage, getMessages, getMessageCount, listContacts } from "../store";
 
 interface SendBody {
   to: string;
@@ -44,6 +45,13 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       await sock.sendMessage(jid, { text: message });
+      storeMessage({
+        from: to.replace(/\+/g, ""),
+        name: "",
+        message,
+        timestamp: Math.floor(Date.now() / 1000),
+        direction: "outgoing",
+      });
       return { success: true, to: jid };
     } catch (error) {
       return reply.status(500).send({ error: `Failed to send: ${String(error)}` });
@@ -76,5 +84,32 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: "Webhook not found" });
     }
     return { success: true, webhooks: listWebhooks() };
+  });
+
+  // List all contacts with message counts
+  app.get("/contacts", async () => {
+    return { contacts: listContacts() };
+  });
+
+  // Get messages for a specific phone number
+  app.get<{ Params: { phone: string }; Querystring: { limit?: string } }>(
+    "/messages/:phone",
+    async (req) => {
+      const { phone } = req.params;
+      const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
+      const messages = getMessages(phone, limit);
+      return {
+        phone,
+        count: messages.length,
+        total: getMessageCount(phone),
+        messages,
+      };
+    },
+  );
+
+  // Get message count for a specific phone number
+  app.get<{ Params: { phone: string } }>("/messages/:phone/count", async (req) => {
+    const { phone } = req.params;
+    return { phone, count: getMessageCount(phone) };
   });
 }
