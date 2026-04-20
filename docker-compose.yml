@@ -1,0 +1,15 @@
+services:
+  whatsapp-bridge:
+    build: .
+    container_name: whatsapp-bridge
+    ports:
+      - "3020:3020"
+    volumes:
+      - ./auth_state:/app/auth_state
+    environment:
+      PORT: "3020"
+      HOST: "0.0.0.0"
+      AUTH_STATE_DIR: "/app/auth_state"
+      LOG_LEVEL: "info"
+      # WEBHOOK_URL: "http://host.docker.internal:8010/api/whatsapp/incoming"
+    restart: unless-stopped
