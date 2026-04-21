@@ -10,6 +10,9 @@ COPY src/ ./src/
 
 RUN npx tsc
 
+# Copy static assets (admin page)
+RUN cp src/admin.html dist/admin.html
+
 # Auth state is mounted as a volume
 RUN mkdir -p /app/auth_state
 

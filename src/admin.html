@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Bridge — Admin</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #25d366; }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .card h2 { font-size: 1rem; color: #999; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .status-connected { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+    .status-disconnected { background: #1c1917; color: #f87171; border: 1px solid #7f1d1d; }
+    .status-qr-pending { background: #1c1917; color: #fbbf24; border: 1px solid #854d0e; }
+    .status-connecting { background: #172554; color: #60a5fa; border: 1px solid #1e40af; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-green { background: #4ade80; animation: pulse 2s infinite; }
+    .dot-red { background: #f87171; }
+    .dot-yellow { background: #fbbf24; animation: pulse 1s infinite; }
+    .dot-blue { background: #60a5fa; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .qr-container { text-align: center; padding: 1rem; }
+    .qr-container img { max-width: 280px; border-radius: 8px; background: #fff; padding: 1rem; }
+    .qr-container p { margin-top: 0.75rem; color: #999; font-size: 0.85rem; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .stat { background: #111; border-radius: 8px; padding: 1rem; text-align: center; }
+    .stat .value { font-size: 1.5rem; font-weight: 700; color: #fff; }
+    .stat .label { font-size: 0.75rem; color: #999; margin-top: 0.25rem; }
+    .contacts-list { max-height: 300px; overflow-y: auto; }
+    .contact { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #222; }
+    .contact:last-child { border-bottom: none; }
+    .contact .phone { font-family: monospace; color: #e5e5e5; }
+    .contact .count { color: #25d366; font-weight: 600; }
+    .btn {
+      background: #25d366;
+      color: #000;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
+    .hidden { display: none; }
+    .refresh-note { text-align: center; color: #666; font-size: 0.75rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WhatsApp Bridge</h1>
+
+    <!-- Status -->
+    <div class="card">
+      <h2>Connection</h2>
+      <div id="status-display">
+        <span class="status-badge status-disconnected">
+          <span class="dot dot-red"></span>
+          Checking...
+        </span>
+      </div>
+      <div id="qr-section" class="qr-container hidden">
+        <img id="qr-img" src="" alt="QR Code" />
+        <p>Scan with WhatsApp → Linked Devices → Link a Device</p>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card">
+      <h2>Messages</h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="value" id="total-contacts">-</div>
+          <div class="label">Contacts</div>
+        </div>
+        <div class="stat">
+          <div class="value" id="total-messages">-</div>
+          <div class="label">Messages</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contacts -->
+    <div class="card">
+      <h2>Recent Contacts</h2>
+      <div class="contacts-list" id="contacts-list">
+        <p style="color: #666; font-size: 0.85rem;">Loading...</p>
+      </div>
+    </div>
+
+    <!-- Send test message -->
+    <div class="card">
+      <h2>Send Message</h2>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;">
+        <input id="send-to" type="tel" placeholder="Phone (e.g. 0541234567)" style="background:#111;border:1px solid #333;border-radius:8px;padding:0.6rem;color:#fff;font-size:0.85rem;" />
+        <input id="send-msg" type="text" placeholder="Message..." style="background:#111;border:1px solid #333;border-radius:8px;padding:0.6rem;color:#fff;font-size:0.85rem;" />
+        <button class="btn" onclick="sendMessage()">Send</button>
+        <p id="send-result" style="color:#999;font-size:0.8rem;margin-top:0.25rem;"></p>
+      </div>
+    </div>
+
+    <p class="refresh-note">Auto-refreshes every 5 seconds</p>
+  </div>
+
+  <script>
+    const BASE = window.location.origin;
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch(`${BASE}/status`);
+        const data = await res.json();
+        updateStatusDisplay(data.status);
+
+        if (data.status === 'qr-pending') {
+          fetchQR();
+        } else {
+          document.getElementById('qr-section').classList.add('hidden');
+        }
+      } catch {
+        updateStatusDisplay('unreachable');
+      }
+    }
+
+    function updateStatusDisplay(status) {
+      const el = document.getElementById('status-display');
+      const map = {
+        connected: { cls: 'status-connected', dot: 'dot-green', label: 'Connected' },
+        disconnected: { cls: 'status-disconnected', dot: 'dot-red', label: 'Disconnected' },
+        'qr-pending': { cls: 'status-qr-pending', dot: 'dot-yellow', label: 'Scan QR Code' },
+        connecting: { cls: 'status-connecting', dot: 'dot-blue', label: 'Connecting...' },
+        unreachable: { cls: 'status-disconnected', dot: 'dot-red', label: 'Unreachable' },
+      };
+      const s = map[status] || map.disconnected;
+      el.innerHTML = `<span class="status-badge ${s.cls}"><span class="dot ${s.dot}"></span>${s.label}</span>`;
+    }
+
+    async function fetchQR() {
+      try {
+        const res = await fetch(`${BASE}/qr`);
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('qr-img').src = data.qr;
+        document.getElementById('qr-section').classList.remove('hidden');
+      } catch {}
+    }
+
+    async function fetchContacts() {
+      try {
+        const res = await fetch(`${BASE}/contacts`);
+        const data = await res.json();
+        const contacts = data.contacts || [];
+
+        document.getElementById('total-contacts').textContent = contacts.length;
+        document.getElementById('total-messages').textContent = contacts.reduce((sum, c) => sum + c.messageCount, 0);
+
+        const list = document.getElementById('contacts-list');
+        if (contacts.length === 0) {
+          list.innerHTML = '<p style="color:#666;font-size:0.85rem;">No messages yet</p>';
+          return;
+        }
+        list.innerHTML = contacts.slice(0, 20).map(c => {
+          const time = c.lastMessage ? new Date(c.lastMessage * 1000).toLocaleString() : '';
+          return `<div class="contact"><span class="phone">${c.phone}</span><span class="count">${c.messageCount} msgs</span></div>`;
+        }).join('');
+      } catch {
+        document.getElementById('contacts-list').innerHTML = '<p style="color:#f87171;font-size:0.85rem;">Failed to load</p>';
+      }
+    }
+
+    async function sendMessage() {
+      const to = document.getElementById('send-to').value.trim();
+      const message = document.getElementById('send-msg').value.trim();
+      const resultEl = document.getElementById('send-result');
+
+      if (!to || !message) {
+        resultEl.textContent = 'Phone and message are required';
+        resultEl.style.color = '#f87171';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${BASE}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to, message }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          resultEl.textContent = `Sent to ${data.to}`;
+          resultEl.style.color = '#4ade80';
+          document.getElementById('send-msg').value = '';
+        } else {
+          resultEl.textContent = data.error || 'Failed';
+          resultEl.style.color = '#f87171';
+        }
+      } catch (e) {
+        resultEl.textContent = 'Network error';
+        resultEl.style.color = '#f87171';
+      }
+    }
+
+    // Initial load
+    fetchStatus();
+    fetchContacts();
+
+    // Auto-refresh
+    setInterval(() => {
+      fetchStatus();
+      fetchContacts();
+    }, 5000);
+  </script>
+</body>
+</html>

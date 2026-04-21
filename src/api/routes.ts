@@ -1,7 +1,14 @@
+import fs from "fs";
+import path from "path";
 import { FastifyInstance } from "fastify";
 import { getStatus, getQRDataURL, getSocket } from "../client";
 import { addWebhook, removeWebhook, listWebhooks } from "../handlers/messages";
 import { storeMessage, getMessages, getMessageCount, listContacts } from "../store";
+
+// In dev: src/admin.html, in prod (dist/): ../src/admin.html
+const adminPath = path.join(__dirname, "..", "admin.html");
+const adminPathAlt = path.join(__dirname, "..", "..", "src", "admin.html");
+const ADMIN_HTML = fs.readFileSync(fs.existsSync(adminPath) ? adminPath : adminPathAlt, "utf-8");
 
 interface SendBody {
   to: string;
@@ -13,6 +20,11 @@ interface WebhookBody {
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
+  // Admin page
+  app.get("/admin", async (_req, reply) => {
+    reply.header("Content-Type", "text/html; charset=utf-8").send(ADMIN_HTML);
+  });
+
   // Health / connection status
   app.get("/status", async () => {
     return { status: getStatus() };
