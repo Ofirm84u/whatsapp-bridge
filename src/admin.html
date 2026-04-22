@@ -14,7 +14,8 @@
       padding: 2rem;
     }
     .container { max-width: 600px; margin: 0 auto; }
-    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; color: #25d366; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #25d366; }
+    .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
     .card {
       background: #1a1a1a;
       border: 1px solid #333;
@@ -34,17 +35,15 @@
     }
     .status-connected { background: #052e16; color: #4ade80; border: 1px solid #166534; }
     .status-disconnected { background: #1c1917; color: #f87171; border: 1px solid #7f1d1d; }
-    .status-qr-pending { background: #1c1917; color: #fbbf24; border: 1px solid #854d0e; }
-    .status-connecting { background: #172554; color: #60a5fa; border: 1px solid #1e40af; }
     .dot { width: 8px; height: 8px; border-radius: 50%; }
     .dot-green { background: #4ade80; animation: pulse 2s infinite; }
     .dot-red { background: #f87171; }
-    .dot-yellow { background: #fbbf24; animation: pulse 1s infinite; }
-    .dot-blue { background: #60a5fa; animation: pulse 1s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .qr-container { text-align: center; padding: 1rem; }
-    .qr-container img { max-width: 280px; border-radius: 8px; background: #fff; padding: 1rem; }
-    .qr-container p { margin-top: 0.75rem; color: #999; font-size: 0.85rem; }
+    .steps { margin-top: 1rem; }
+    .step { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.5rem; border-radius: 8px; background: #111; }
+    .step-num { background: #25d366; color: #000; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; margin-top: 2px; }
+    .step-text { font-size: 0.85rem; color: #ccc; line-height: 1.5; }
+    .step-text code { background: #222; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; color: #25d366; }
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
     .stat { background: #111; border-radius: 8px; padding: 1rem; text-align: center; }
     .stat .value { font-size: 1.5rem; font-weight: 700; color: #fff; }
@@ -55,39 +54,31 @@
     .contact .phone { font-family: monospace; color: #e5e5e5; }
     .contact .count { color: #25d366; font-weight: 600; }
     .btn {
-      background: #25d366;
-      color: #000;
-      border: none;
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: opacity 0.2s;
+      background: #25d366; color: #000; border: none; padding: 0.6rem 1.2rem;
+      border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem;
     }
     .btn:hover { opacity: 0.85; }
-    .btn-danger { background: #dc2626; color: #fff; }
-    .actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
-    .hidden { display: none; }
+    .send-form { display: flex; flex-direction: column; gap: 0.5rem; }
+    .send-form input { background: #111; border: 1px solid #333; border-radius: 8px; padding: 0.6rem; color: #fff; font-size: 0.85rem; }
+    #send-result { color: #999; font-size: 0.8rem; margin-top: 0.25rem; }
     .refresh-note { text-align: center; color: #666; font-size: 0.75rem; margin-top: 1rem; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>WhatsApp Bridge</h1>
+    <p class="subtitle">Chrome Extension + Local Relay</p>
 
     <!-- Status -->
     <div class="card">
       <h2>Connection</h2>
       <div id="status-display">
-        <span class="status-badge status-disconnected">
-          <span class="dot dot-red"></span>
-          Checking...
-        </span>
+        <span class="status-badge status-disconnected"><span class="dot dot-red"></span>Checking...</span>
       </div>
-      <div id="qr-section" class="qr-container hidden">
-        <img id="qr-img" src="" alt="QR Code" />
-        <p>Scan with WhatsApp → Linked Devices → Link a Device</p>
+      <div id="setup-steps" class="steps">
+        <div class="step"><span class="step-num">1</span><span class="step-text">Install the Chrome extension from <code>extension/</code> folder (chrome://extensions → Load unpacked)</span></div>
+        <div class="step"><span class="step-num">2</span><span class="step-text">Open <a href="https://web.whatsapp.com" target="_blank" style="color:#25d366;">web.whatsapp.com</a> and log in normally</span></div>
+        <div class="step"><span class="step-num">3</span><span class="step-text">The extension auto-connects to this relay server</span></div>
       </div>
     </div>
 
@@ -95,14 +86,8 @@
     <div class="card">
       <h2>Messages</h2>
       <div class="stats">
-        <div class="stat">
-          <div class="value" id="total-contacts">-</div>
-          <div class="label">Contacts</div>
-        </div>
-        <div class="stat">
-          <div class="value" id="total-messages">-</div>
-          <div class="label">Messages</div>
-        </div>
+        <div class="stat"><div class="value" id="total-contacts">-</div><div class="label">Contacts</div></div>
+        <div class="stat"><div class="value" id="total-messages">-</div><div class="label">Messages</div></div>
       </div>
     </div>
 
@@ -114,14 +99,14 @@
       </div>
     </div>
 
-    <!-- Send test message -->
+    <!-- Send -->
     <div class="card">
       <h2>Send Message</h2>
-      <div style="display:flex;flex-direction:column;gap:0.5rem;">
-        <input id="send-to" type="tel" placeholder="Phone (e.g. 0541234567)" style="background:#111;border:1px solid #333;border-radius:8px;padding:0.6rem;color:#fff;font-size:0.85rem;" />
-        <input id="send-msg" type="text" placeholder="Message..." style="background:#111;border:1px solid #333;border-radius:8px;padding:0.6rem;color:#fff;font-size:0.85rem;" />
+      <div class="send-form">
+        <input id="send-to" type="tel" placeholder="Phone (e.g. 0541234567)" />
+        <input id="send-msg" type="text" placeholder="Message..." />
         <button class="btn" onclick="sendMessage()">Send</button>
-        <p id="send-result" style="color:#999;font-size:0.8rem;margin-top:0.25rem;"></p>
+        <p id="send-result"></p>
       </div>
     </div>
 
@@ -135,39 +120,18 @@
       try {
         const res = await fetch(`${BASE}/status`);
         const data = await res.json();
-        updateStatusDisplay(data.status);
-
-        if (data.status === 'qr-pending') {
-          fetchQR();
+        const el = document.getElementById('status-display');
+        const steps = document.getElementById('setup-steps');
+        if (data.status === 'connected') {
+          el.innerHTML = '<span class="status-badge status-connected"><span class="dot dot-green"></span>Extension Connected</span>';
+          steps.style.display = 'none';
         } else {
-          document.getElementById('qr-section').classList.add('hidden');
+          el.innerHTML = '<span class="status-badge status-disconnected"><span class="dot dot-red"></span>Extension Not Connected</span>';
+          steps.style.display = 'block';
         }
       } catch {
-        updateStatusDisplay('unreachable');
+        document.getElementById('status-display').innerHTML = '<span class="status-badge status-disconnected"><span class="dot dot-red"></span>Relay Unreachable</span>';
       }
-    }
-
-    function updateStatusDisplay(status) {
-      const el = document.getElementById('status-display');
-      const map = {
-        connected: { cls: 'status-connected', dot: 'dot-green', label: 'Connected' },
-        disconnected: { cls: 'status-disconnected', dot: 'dot-red', label: 'Disconnected' },
-        'qr-pending': { cls: 'status-qr-pending', dot: 'dot-yellow', label: 'Scan QR Code' },
-        connecting: { cls: 'status-connecting', dot: 'dot-blue', label: 'Connecting...' },
-        unreachable: { cls: 'status-disconnected', dot: 'dot-red', label: 'Unreachable' },
-      };
-      const s = map[status] || map.disconnected;
-      el.innerHTML = `<span class="status-badge ${s.cls}"><span class="dot ${s.dot}"></span>${s.label}</span>`;
-    }
-
-    async function fetchQR() {
-      try {
-        const res = await fetch(`${BASE}/qr`);
-        if (!res.ok) return;
-        const data = await res.json();
-        document.getElementById('qr-img').src = data.qr;
-        document.getElementById('qr-section').classList.remove('hidden');
-      } catch {}
     }
 
     async function fetchContacts() {
@@ -175,19 +139,16 @@
         const res = await fetch(`${BASE}/contacts`);
         const data = await res.json();
         const contacts = data.contacts || [];
-
         document.getElementById('total-contacts').textContent = contacts.length;
         document.getElementById('total-messages').textContent = contacts.reduce((sum, c) => sum + c.messageCount, 0);
-
         const list = document.getElementById('contacts-list');
         if (contacts.length === 0) {
           list.innerHTML = '<p style="color:#666;font-size:0.85rem;">No messages yet</p>';
           return;
         }
-        list.innerHTML = contacts.slice(0, 20).map(c => {
-          const time = c.lastMessage ? new Date(c.lastMessage * 1000).toLocaleString() : '';
-          return `<div class="contact"><span class="phone">${c.phone}</span><span class="count">${c.messageCount} msgs</span></div>`;
-        }).join('');
+        list.innerHTML = contacts.slice(0, 20).map(c =>
+          `<div class="contact"><span class="phone">${c.phone}</span><span class="count">${c.messageCount} msgs</span></div>`
+        ).join('');
       } catch {
         document.getElementById('contacts-list').innerHTML = '<p style="color:#f87171;font-size:0.85rem;">Failed to load</p>';
       }
@@ -197,13 +158,7 @@
       const to = document.getElementById('send-to').value.trim();
       const message = document.getElementById('send-msg').value.trim();
       const resultEl = document.getElementById('send-result');
-
-      if (!to || !message) {
-        resultEl.textContent = 'Phone and message are required';
-        resultEl.style.color = '#f87171';
-        return;
-      }
-
+      if (!to || !message) { resultEl.textContent = 'Phone and message required'; resultEl.style.color = '#f87171'; return; }
       try {
         const res = await fetch(`${BASE}/send`, {
           method: 'POST',
@@ -212,7 +167,7 @@
         });
         const data = await res.json();
         if (res.ok) {
-          resultEl.textContent = `Sent to ${data.to}`;
+          resultEl.textContent = 'Sent!';
           resultEl.style.color = '#4ade80';
           document.getElementById('send-msg').value = '';
         } else {
@@ -225,15 +180,9 @@
       }
     }
 
-    // Initial load
     fetchStatus();
     fetchContacts();
-
-    // Auto-refresh
-    setInterval(() => {
-      fetchStatus();
-      fetchContacts();
-    }, 5000);
+    setInterval(() => { fetchStatus(); fetchContacts(); }, 5000);
   </script>
 </body>
 </html>

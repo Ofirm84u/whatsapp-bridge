@@ -11,7 +11,6 @@ export interface IncomingMessage {
 
 const webhookUrls: Set<string> = new Set();
 
-// Load initial webhook from env
 const envWebhook = process.env.WEBHOOK_URL;
 if (envWebhook) {
   webhookUrls.add(envWebhook);
@@ -51,8 +50,6 @@ export async function dispatchToWebhooks(msg: IncomingMessage): Promise<void> {
 
       if (!response.ok) {
         logger.warn({ url, status: response.status }, "Webhook returned non-OK");
-      } else {
-        logger.debug({ url }, "Webhook dispatched");
       }
     } catch (error) {
       logger.error({ url, error: String(error) }, "Webhook dispatch failed");

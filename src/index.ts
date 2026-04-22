@@ -1,22 +1,26 @@
+import { WebSocketServer } from "ws";
 import pino from "pino";
-import { startClient, stopClient } from "./client";
 import { startServer } from "./api/server";
+import { setupWebSocket } from "./relay";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
 async function main() {
-  logger.info("Starting WhatsApp Bridge...");
+  logger.info("Starting WhatsApp Bridge Relay...");
 
-  // Start the REST API
+  // Start the HTTP API
   const app = await startServer();
 
-  // Start the WhatsApp client (connects + shows QR)
-  await startClient();
+  // Attach WebSocket server to the same port
+  const wss = new WebSocketServer({ server: app.server });
+  setupWebSocket(wss);
+
+  logger.info("WebSocket relay ready — install the Chrome extension and open WhatsApp Web");
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "Shutting down...");
-    await stopClient();
+    wss.close();
     await app.close();
     process.exit(0);
   };

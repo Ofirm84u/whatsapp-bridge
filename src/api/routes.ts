@@ -1,11 +1,11 @@
 import fs from "fs";
 import path from "path";
 import { FastifyInstance } from "fastify";
-import { getStatus, getQRDataURL, getSocket } from "../client";
+import { isExtensionConnected, sendToExtension } from "../relay";
 import { addWebhook, removeWebhook, listWebhooks } from "../handlers/messages";
 import { storeMessage, getMessages, getMessageCount, listContacts } from "../store";
 
-// In dev: src/admin.html, in prod (dist/): ../src/admin.html
+// Load admin HTML — works from both src/ (dev) and dist/ (prod)
 const adminPath = path.join(__dirname, "..", "admin.html");
 const adminPathAlt = path.join(__dirname, "..", "..", "src", "admin.html");
 const ADMIN_HTML = fs.readFileSync(fs.existsSync(adminPath) ? adminPath : adminPathAlt, "utf-8");
@@ -25,21 +25,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     reply.header("Content-Type", "text/html; charset=utf-8").send(ADMIN_HTML);
   });
 
-  // Health / connection status
+  // Connection status
   app.get("/status", async () => {
-    return { status: getStatus() };
+    return { status: isExtensionConnected() ? "connected" : "disconnected" };
   });
 
-  // QR code for pairing (base64 data URL)
-  app.get("/qr", async (_req, reply) => {
-    const qr = getQRDataURL();
-    if (!qr) {
-      return reply.status(404).send({ error: "No QR code available — already connected or not yet generated" });
-    }
-    return { qr };
-  });
-
-  // Send a text message
+  // Send a text message via the extension
   app.post<{ Body: SendBody }>("/send", async (req, reply) => {
     const { to, message } = req.body;
 
@@ -47,79 +38,60 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: "Both 'to' and 'message' are required" });
     }
 
-    const sock = getSocket();
-    if (!sock) {
-      return reply.status(503).send({ error: "WhatsApp not connected" });
+    if (!isExtensionConnected()) {
+      return reply.status(503).send({ error: "Chrome extension not connected — open WhatsApp Web" });
     }
 
-    // Normalize phone number: strip +, ensure @s.whatsapp.net
-    const jid = to.replace(/\+/g, "").replace(/@s\.whatsapp\.net$/, "") + "@s.whatsapp.net";
-
     try {
-      await sock.sendMessage(jid, { text: message });
+      const result = await sendToExtension("send_message", { to, message });
       storeMessage({
-        from: to.replace(/\+/g, ""),
+        from: to.replace(/[+\-\s]/g, ""),
         name: "",
         message,
         timestamp: Math.floor(Date.now() / 1000),
         direction: "outgoing",
       });
-      return { success: true, to: jid };
+      return { success: true, to, result };
     } catch (error) {
       return reply.status(500).send({ error: `Failed to send: ${String(error)}` });
     }
   });
 
-  // Register a webhook URL
+  // Webhook management
   app.post<{ Body: WebhookBody }>("/webhooks", async (req, reply) => {
     const { url } = req.body;
-    if (!url) {
-      return reply.status(400).send({ error: "'url' is required" });
-    }
+    if (!url) return reply.status(400).send({ error: "'url' is required" });
     addWebhook(url);
     return { success: true, webhooks: listWebhooks() };
   });
 
-  // List registered webhooks
   app.get("/webhooks", async () => {
     return { webhooks: listWebhooks() };
   });
 
-  // Remove a webhook
   app.delete<{ Body: WebhookBody }>("/webhooks", async (req, reply) => {
     const { url } = req.body;
-    if (!url) {
-      return reply.status(400).send({ error: "'url' is required" });
-    }
+    if (!url) return reply.status(400).send({ error: "'url' is required" });
     const removed = removeWebhook(url);
-    if (!removed) {
-      return reply.status(404).send({ error: "Webhook not found" });
-    }
+    if (!removed) return reply.status(404).send({ error: "Webhook not found" });
     return { success: true, webhooks: listWebhooks() };
   });
 
-  // List all contacts with message counts
+  // Message history
   app.get("/contacts", async () => {
     return { contacts: listContacts() };
   });
 
-  // Get messages for a specific phone number
   app.get<{ Params: { phone: string }; Querystring: { limit?: string } }>(
     "/messages/:phone",
     async (req) => {
       const { phone } = req.params;
       const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
       const messages = getMessages(phone, limit);
-      return {
-        phone,
-        count: messages.length,
-        total: getMessageCount(phone),
-        messages,
-      };
+      return { phone, count: messages.length, total: getMessageCount(phone), messages };
     },
   );
 
-  // Get message count for a specific phone number
   app.get<{ Params: { phone: string } }>("/messages/:phone/count", async (req) => {
     const { phone } = req.params;
     return { phone, count: getMessageCount(phone) };

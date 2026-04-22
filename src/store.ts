@@ -1,6 +1,6 @@
 /**
  * Message store — persists messages to a JSON file per contact.
- * Stored in AUTH_STATE_DIR/messages/<phone>.json
+ * Stored in data/messages/<phone>.json
  */
 
 import fs from "fs";
@@ -9,8 +9,8 @@ import pino from "pino";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
-const AUTH_DIR = process.env.AUTH_STATE_DIR || "./auth_state";
-const MESSAGES_DIR = path.resolve(AUTH_DIR, "messages");
+const DATA_DIR = process.env.DATA_DIR || "./data";
+const MESSAGES_DIR = path.resolve(DATA_DIR, "messages");
 
 export interface StoredMessage {
   from: string;
@@ -20,7 +20,6 @@ export interface StoredMessage {
   direction: "incoming" | "outgoing";
 }
 
-// Ensure messages directory exists
 function ensureDir(): void {
   if (!fs.existsSync(MESSAGES_DIR)) {
     fs.mkdirSync(MESSAGES_DIR, { recursive: true });
@@ -28,8 +27,7 @@ function ensureDir(): void {
 }
 
 function phoneToFile(phone: string): string {
-  // Normalize: strip +, spaces, dashes
-  const normalized = phone.replace(/[+\-\s()]/g, "");
+  const normalized = phone.replace(/[+\-\s()@c.us]/g, "");
   return path.join(MESSAGES_DIR, `${normalized}.json`);
 }
 
@@ -56,12 +54,10 @@ export function storeMessage(msg: StoredMessage): void {
   const existing = readMessages(phone);
   existing.push(msg);
   writeMessages(phone, existing);
-  logger.debug({ phone, direction: msg.direction }, "Message stored");
 }
 
 export function getMessages(phone: string, limit?: number): StoredMessage[] {
-  const normalized = phone.replace(/[+\-\s()]/g, "");
-  // Also try with 972 prefix if starts with 0
+  const normalized = phone.replace(/[+\-\s()@c.us]/g, "");
   const variants = [normalized];
   if (normalized.startsWith("0")) {
     variants.push("972" + normalized.slice(1));

@@ -1,12 +1,11 @@
 import Fastify from "fastify";
-import pino from "pino";
 import { registerRoutes } from "./routes";
-
-const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
 export async function createServer() {
   const app = Fastify({
-    logger: logger as any,
+    logger: {
+      level: process.env.LOG_LEVEL || "info",
+    },
   });
 
   await registerRoutes(app);
@@ -21,7 +20,7 @@ export async function startServer() {
   const host = process.env.HOST || "0.0.0.0";
 
   await app.listen({ port, host });
-  logger.info({ port, host }, "API server listening");
+  app.log.info({ port, host }, "API server listening");
 
   return app;
 }

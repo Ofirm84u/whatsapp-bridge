@@ -3,3 +3,5 @@ dist/
 auth_state/
 .env
 *.log
+.wwebjs_cache/
+data/
